@@ -2,6 +2,7 @@ import socket
 import struct
 import sys
 import os
+import math
 
 BUFFER_SIZE = 1024
 DATA_SIZE = 1020
@@ -27,30 +28,42 @@ if not os.path.exists('Cliente'):
     os.makedirs('Cliente')
 
 cliente = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # Cria o socket UDP
+cliente.settimeout(2.0)
 
 # Envia nome do arquivo
 cliente.sendto(ARQUIVO_LOCAL.encode(), SERVER_ADDRESS)
 
 # Envia o arquivo
 with open(arquivo_path, 'rb') as f:
+    max_pacotes = math.ceil(os.path.gesize(arquivo_path) / DATA_SIZE)
     num_pacote = 0
 
     while True:
-        dados = f.read(DATA_SIZE)
+        pacote = struct.pack('>5sI', b'BEGIN', max_pacotes)
+        cliente.sendto(pacote, SERVER_ADDRESS) 
 
-        if not dados:
+        try:
+            data, _ = cliente.recvfrom(BUFFER_SIZE)
+            id = struct.unpack('>I', data)
             break
+        except socket.timeout:
+            print(f"Nao foi possivel iniciar a comunicacao com o servidor\n")
 
-        cabecalho = struct.pack('>I', num_pacote) 
-        pacote = cabecalho + dados
-        cliente.sendto(pacote, SERVER_ADDRESS)
+    while (dados := f.read(DATA_SIZE)):
 
-        print(f"Enviado pacote {num_pacote}")
+        while True:
+            cabecalho = struct.pack('>I', id) 
+            pacote = cabecalho + dados
+            cliente.sendto(pacote, SERVER_ADDRESS)
+            
+            try:
+                ack, _ = cliente.recvfrom(1)
+                break
+            except socket.timeout:
+                print(f"Nao foi possivel enviar o pacote {num_pacote}, reenviando\n")
+
+        print(f"Enviado pacote {num_pacote}\n")
         num_pacote += 1
-
-# Informa quando finaliza o envio do arquivo
-cliente.sendto(b'FINAL', SERVER_ADDRESS)
-print("Envio do arquivo finalizado. Aguardando resposta do servidor.")
 
 # Recebe os pacotes numerados
 pacotes = {}
@@ -58,33 +71,23 @@ maior_pacote = -1
 
 print("Esperando pacotes")
 
-while True:
-    dados, _ = cliente.recvfrom(BUFFER_SIZE)
+cliente.settimeout(None)
 
-    if dados == b'FIM':
-        print("Recebeu todos os pacotes")
-        break
-
-    indice = struct.unpack('>I', dados[:4])[0]              # Verifica o número do pacote
-    conteudo = dados[4:]                                    # Contém o conteúdo do pacote
-
-    pacotes[indice] = conteudo
-
-    if indice > maior_pacote:
-        maior_pacote = indice
-
-# Verifica se perdeu pacotes 
-falta = [i for i in range(maior_pacote + 1) if i not in pacotes]
-if falta:
-    print(f"Pacotes faltando: {falta}")
+for i in range(max_pacotes):
+    data, _ = cliente.recvfrom(BUFFER_SIZE)
+    session_id = struct.unpack('>I', data[:4])
+    if session_id != id:
+        continue  # pacote de outra sessão
+    pacotes[i] = data[4:]
+    # envia ACK de recebimento
+    cliente.sendto(b'\x01', SERVER_ADDRESS)
 
 # Reordena os pacotes e salva o arquivo devolvido
 arquivo_retorno = os.path.join('Cliente', 'devolvido_' + ARQUIVO_LOCAL)
 with open(arquivo_retorno, 'wb') as f:
-    for i in sorted(pacotes.keys()):
+    for i in range(max_pacotes):
         f.write(pacotes[i])
 
 print(f"Arquivo devolvido salvo como: {arquivo_retorno}")
 
-cliente.sendto(b'FIM_CLIENTE', SERVER_ADDRESS)
 cliente.close()                                             # Fecha o socket do cliente
