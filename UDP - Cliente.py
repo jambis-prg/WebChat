@@ -67,7 +67,6 @@ with open(arquivo_path, 'rb') as f:
 
 # Recebe os pacotes numerados
 pacotes = {}
-maior_pacote = -1
 
 print("Esperando pacotes")
 
