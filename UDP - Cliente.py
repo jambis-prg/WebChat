@@ -27,37 +27,36 @@ if not os.path.exists(arquivo_path):
 if not os.path.exists('Cliente'):
     os.makedirs('Cliente')
 
-cliente = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # Cria o socket UDP
-cliente.settimeout(2.0)
+cliente = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)              # Cria o socket UDP
+cliente.settimeout(2.0)                                                 # Define o timeout do socket para 2 segundos
 
 # Envia nome do arquivo
 cliente.sendto(ARQUIVO_LOCAL.encode(), SERVER_ADDRESS)
 
 # Envia o arquivo
 with open(arquivo_path, 'rb') as f:
-    max_pacotes = math.ceil(os.path.gesize(arquivo_path) / DATA_SIZE)
+    max_pacotes = math.ceil(os.path.gesize(arquivo_path) / DATA_SIZE)   # Calcula o número máximo de pacotes
     num_pacote = 0
 
     while True:
-        pacote = struct.pack('>5sI', b'BEGIN', max_pacotes)
+        pacote = struct.pack('>5sI', b'BEGIN', max_pacotes)             # Cria o pacote de início com o nome do arquivo e número máximo de pacotes
         cliente.sendto(pacote, SERVER_ADDRESS) 
 
         try:
-            data, _ = cliente.recvfrom(BUFFER_SIZE)
-            id = struct.unpack('>I', data)
+            data, _ = cliente.recvfrom(BUFFER_SIZE)                    
+            id = struct.unpack('>I', data)                              # Recebe o ID da sessão do servidor
             break
         except socket.timeout:
             print(f"Nao foi possivel iniciar a comunicacao com o servidor\n")
 
-    while (dados := f.read(DATA_SIZE)):
-
+    while (dados := f.read(DATA_SIZE)):                                 
         while True:
             cabecalho = struct.pack('>I', id) 
-            pacote = cabecalho + dados
+            pacote = cabecalho + dados                                  # Cria o pacote com o ID da sessão e os dados do arquivo
             cliente.sendto(pacote, SERVER_ADDRESS)
             
             try:
-                ack, _ = cliente.recvfrom(1)
+                ack, _ = cliente.recvfrom(1)                            # Espera pela confirmação do servidor
                 break
             except socket.timeout:
                 print(f"Nao foi possivel enviar o pacote {num_pacote}, reenviando\n")
@@ -65,21 +64,19 @@ with open(arquivo_path, 'rb') as f:
         print(f"Enviado pacote {num_pacote}\n")
         num_pacote += 1
 
-# Recebe os pacotes numerados
+# Prepara para receber os pacotes numerados
 pacotes = {}
-
 print("Esperando pacotes")
 
-cliente.settimeout(None)
+cliente.settimeout(None)                                                # Remove o temporizador para receber os pacotes
 
-for i in range(max_pacotes):
+for i in range(max_pacotes):                                            # Recebe os pacotes numerados
     data, _ = cliente.recvfrom(BUFFER_SIZE)
     session_id = struct.unpack('>I', data[:4])
     if session_id != id:
-        continue  # pacote de outra sessão
+        continue                                                        # Verifica se o ID da sessão corresponde ao esperado
     pacotes[i] = data[4:]
-    # envia ACK de recebimento
-    cliente.sendto(b'\x01', SERVER_ADDRESS)
+    cliente.sendto(b'\x01', SERVER_ADDRESS)                             # Envia confirmação de recebimento do pacote
 
 # Reordena os pacotes e salva o arquivo devolvido
 arquivo_retorno = os.path.join('Cliente', 'devolvido_' + ARQUIVO_LOCAL)
@@ -89,4 +86,4 @@ with open(arquivo_retorno, 'wb') as f:
 
 print(f"Arquivo devolvido salvo como: {arquivo_retorno}")
 
-cliente.close()                                             # Fecha o socket do cliente
+cliente.close()                                                         # Fecha o socket do cliente
