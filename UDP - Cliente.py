@@ -54,20 +54,20 @@ cliente.settimeout(2.0)                                                 # Define
 
 # Envia o arquivo
 with open(arquivo_path, 'rb') as f:
-    max_pacotes = math.ceil(os.path.gesize(arquivo_path) / DATA_SIZE)   # Calcula o número máximo de pacotes
+    max_pacotes = math.ceil(os.path.getsize(arquivo_path) / DATA_SIZE)   # Calcula o número máximo de pacotes
     num_pacote = 0
 
     pacote = struct.pack('>5sI', b'BEGIN', max_pacotes)             # Cria o pacote de início com o nome do arquivo e número máximo de pacotes
     pacote += ARQUIVO_LOCAL.encode() # Adiciona o nome do arquivo
-    id = struct.unpack('>I', send_blocking(cliente=cliente, pacote=pacote)) # Obtendo o ID
+    id, = struct.unpack('>I', send_blocking(cliente=cliente, pacote=pacote)) # Obtendo o ID
 
     while (dados := f.read(DATA_SIZE)):                                 
-        cabecalho = struct.pack('>5s2I', b'CHUNK', id, num_pacote) 
+        cabecalho = struct.pack('>5s2I', b'CHUNK', id, num_pacote)
         pacote = cabecalho + dados                                  # Cria o pacote com o ID da sessão e os dados do arquivo
 
         # Garante que apenas envie o proximo pacote se for o ID da sessao atual
         while True:
-            ack_id = struct.unpack('>I', send_blocking(cliente=cliente, pacote=pacote))
+            ack_id, = struct.unpack('>I', send_blocking(cliente=cliente, pacote=pacote))
             if (ack_id == id):
                 break
         
@@ -95,8 +95,8 @@ while True:
             num_pacote += 1
     elif (cabecalho == b'BEGIN' and sessao_id == id): # Verifica se o servidor iniciou a comunicao
         novo_nome = str(data[9:].decode())
-
-    cliente.sendto(sessao_id, SERVER_ADDRESS) # Enviado pacote de reconhecimento
+    ack_id = struct.pack('>I', sessao_id) # Prepara o pacote de reconhecimento
+    cliente.sendto(ack_id, SERVER_ADDRESS) # Enviado pacote de reconhecimento
 
     if (num_pacote >= max_pacotes):
         break
