@@ -2,6 +2,7 @@
 
 import socket
 import struct
+import random
 
 class RDTReceiver:
     def __init__(self, listen_addr):
@@ -29,6 +30,12 @@ class RDTReceiver:
             seq, payload = self._parse_packet(pkt)
 
             if seq == self.expected_seq:
+                v = random.random()
+                if v > 0.98:
+                    print('Simulando perda')
+                    continue
+
+
                 print(f"[RDT] Pacote {seq} recebido corretamente.")
                 ack = self._make_ack(seq)
                 self.sock.sendto(ack, addr)
