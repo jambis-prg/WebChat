@@ -1,14 +1,19 @@
-# rdt_receiver.py
-
 import socket
 import struct
 import random
+from Simulador_de_rede import Simulador_de_Perdas
 
 class RDTReceiver:
-    def __init__(self, listen_addr):
+    def __init__(self, listen_addr, simu_rede=None):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind(listen_addr)
         self.expected_seq = 0
+        
+        if simu_rede is None:
+            taxa_de_perda = Simulador_de_Perdas.recolher_taxa_dos_argumentos()
+            self.simu_rede = Simulador_de_Perdas(taxa_de_perda)
+        else:
+            self.simu_rede = simu_rede
 
     def _make_ack(self, seq: int) -> bytes:
         return struct.pack('B', seq)
@@ -30,11 +35,9 @@ class RDTReceiver:
             seq, payload = self._parse_packet(pkt)
 
             if seq == self.expected_seq:
-                v = random.random()
-                if v > 0.98:
-                    print('Simulando perda')
+                # Simular perda de pacote
+                if self.simu_rede.simula_perda_de_pacote(f"Pacote seq={seq}"):
                     continue
-
 
                 print(f"[RDT] Pacote {seq} recebido corretamente.")
                 ack = self._make_ack(seq)
