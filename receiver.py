@@ -9,37 +9,24 @@ class RDTReceiver:
         self.sock.bind(listen_addr)
         self.expected_seq = 0
 
-    def _checksum(self, data: bytes) -> int:
-        if len(data) % 2 == 1:
-            data += b'\x00'
-        s = sum(struct.unpack('!%dH' % (len(data) // 2), data))
-        while s > 0xFFFF:
-            s = (s & 0xFFFF) + (s >> 16)
-        return ~s & 0xFFFF
-
     def _make_ack(self, seq: int) -> bytes:
-        checksum = self._checksum(struct.pack('!B', seq))
-        return struct.pack('!BH', seq, checksum)
+        return struct.pack('B', seq)
 
     def _parse_packet(self, pkt: bytes):
         if len(pkt) < 3:
             return None, None, False
-        seq, recv_checksum = struct.unpack('!BH', pkt[:3])
-        payload = pkt[3:]
-        calc_checksum = self._checksum(struct.pack('!B', seq) + payload)
-        valid = (recv_checksum == calc_checksum)
-        return seq, payload, valid
+
+        seq, = struct.unpack("B", pkt[:1])
+        payload = pkt[1:]
+        return seq, payload
+    
+    def close(self):
+        self.sock.close()
 
     def receive(self) -> bytes:
         while True:
             pkt, addr = self.sock.recvfrom(2048)
-            seq, payload, valid = self._parse_packet(pkt)
-
-            if not valid:
-                print("[RDT] Pacote corrompido. Reenviando último ACK.")
-                ack = self._make_ack(1 - self.expected_seq)
-                self.sock.sendto(ack, addr)
-                continue
+            seq, payload = self._parse_packet(pkt)
 
             if seq == self.expected_seq:
                 print(f"[RDT] Pacote {seq} recebido corretamente.")

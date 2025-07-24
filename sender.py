@@ -8,28 +8,15 @@ class RDTSender:
         self.receiver_addr = receiver_addr
         self.seq = 0
         self.timeout = timeout
-
-    def _checksum(self, data: bytes) -> int:
-        if len(data) % 2 == 1:
-            data += b'\x00'
-        s = sum(struct.unpack('!%dH' % (len(data) // 2), data))
-        while s > 0xFFFF:
-            s = (s & 0xFFFF) + (s >> 16)
-        return ~s & 0xFFFF
-
+        
     def _make_packet(self, seq: int, payload: bytes) -> bytes:
-        header = struct.pack('!B', seq)
-        checksum = self._checksum(header + payload)
-        return struct.pack('!BH', seq, checksum) + payload
+        return struct.pack('B', seq) + payload
 
     def _parse_ack(self, data: bytes):
-        if len(data) != 3:
+        if len(data) != 1:
             return None
-        seq, recv_checksum = struct.unpack('!BH', data)
-        calc_checksum = self._checksum(struct.pack('!B', seq))
-        if recv_checksum == calc_checksum:
-            return seq
-        return None
+        seq, = struct.unpack('B', data)
+        return seq
 
     def send(self, data: bytes):
         pkt = self._make_packet(self.seq, data)

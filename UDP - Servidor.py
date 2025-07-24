@@ -3,9 +3,11 @@ import struct
 import os
 import math
 import random
+from sender import RDTSender
+from receiver import RDTReceiver
 
 BUFFER_SIZE = 1024
-HEADER_SIZE = 13
+HEADER_SIZE = 6
 DATA_SIZE = BUFFER_SIZE - HEADER_SIZE
 SERVER_ADDRESS = ('localhost', 12345)
 
@@ -24,81 +26,56 @@ def send_blocking(servidor, pacote, cliente_address):
             print(f"Timeout ao enviar pacote para o cliente")
     return data
 
-servidor = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-servidor.bind(SERVER_ADDRESS)
-servidor.settimeout(2.0)
-
-print(f"Servidor UDP iniciado em {SERVER_ADDRESS}")
-print("Aguardando conexões...")
-
-send_back = False
-
 while True:
-    try:
-        dados, cliente_address = servidor.recvfrom(BUFFER_SIZE)
-        cabecalho, data_int = struct.unpack('>5sI', dados[:9])
-        
-        if cabecalho == b'BEGIN':
-            nome_arquivo = dados[9:].decode()
-            max_pacotes = data_int
-            print(f"Cliente {cliente_address} enviando o arquivo: {nome_arquivo}")
-            
-            sessao_id = random.randint(1, 2**32 - 1)    # Gera um ID de sessão aleatório
-            
-            # Armazena os pacotes recebidos
-            pacotes_recebidos = {}
-            num_pacote_esperado = 0
-            num_pacote = 0
-            
-            print(f"Sessão iniciada com ID: {sessao_id}")
-        elif cabecalho == b'CHUNK':
-            id_recebido = data_int
-            num_pacote, = struct.unpack('>I', dados[9:13])
-            if id_recebido == sessao_id and num_pacote == num_pacote_esperado:
-                pacotes_recebidos[num_pacote] = dados[13:]
-                num_pacote_esperado += 1
-                print(f"{num_pacote_esperado}/{max_pacotes}")
+    servidor = RDTReceiver(SERVER_ADDRESS)
 
-                if (num_pacote_esperado >= max_pacotes):
-                    send_back = True
-                    
+    # Prepara para receber os pacotes numerados
+    pacotes = {}
+    print("Esperando pacotes")
 
-        # Envia acknowledgment com o ID da sessão
-        ack_pacote = struct.pack('>I', sessao_id)
-        servidor.sendto(ack_pacote, cliente_address)
+    num_pacote = 0
 
-        if (send_back):
-            send_back = False
-            # Salva o arquivo no servidor
-            arquivo_servidor = os.path.join('Servidor', nome_arquivo)
-            with open(arquivo_servidor, 'wb') as f:
-                for i in range(max_pacotes):
-                    f.write(pacotes_recebidos[i])
+    pacote = servidor.receive()
+    print(pacote)
+    nome_arquivo = pacote[5:].decode()
 
-            print(f"Arquivo salvo como {arquivo_servidor}")
-            
-            # Envia o pacote BEGIN de volta
-            nome_arquivo_servidor = os.path.basename(arquivo_servidor) 
-            pacote_begin = struct.pack('>5sI', b'BEGIN', sessao_id)
-            pacote_begin += ("servidor_" + nome_arquivo_servidor).encode()
-            send_blocking(servidor, pacote_begin, cliente_address)
-            
-            # Envia o arquivo de volta para o cliente
-            with open(arquivo_servidor, 'rb') as f:
-                indice_pacote = 0
-                while (dados := f.read(DATA_SIZE)):
-                    cabecalho = struct.pack('>5s2I', b'CHUNK', sessao_id, indice_pacote)
-                    pacote = cabecalho + dados
+    while True:
+        pacote = servidor.receive()
+        print(pacote)
+        cabecalho, = struct.unpack('5s', pacote[:5])
+        print(cabecalho)
 
-                    while True:
-                        ack_id, = struct.unpack('>I', send_blocking(servidor=servidor, pacote=pacote, cliente_address=cliente_address))
-                        if (ack_id == sessao_id):
-                            break
+        if cabecalho == b'CHUNK':
+            pacotes[num_pacote] = pacote[5:]
+            num_pacote += 1
+        else:
+            break
 
-                    print(f"Enviado pacote {indice_pacote}\n")
-                    indice_pacote += 1
-            
-            print(f"Arquivo {arquivo_servidor} enviado de volta para o cliente")
-    except Exception as e:
-        print(f"Erro: {e}")
-        continue
+    servidor.close()
+
+    arquivo_servidor = os.path.join('Servidor', nome_arquivo)
+
+    with open(arquivo_servidor, 'wb') as f:
+        for i in range(num_pacote):
+            f.write(pacotes[i])
+
+    servidor = RDTSender(SERVER_ADDRESS, 2.0)
+
+    # Envia o arquivo
+    with open(arquivo_servidor, 'rb') as f:
+        num_pacote = 0
+
+        nome_arquivo_servidor = os.path.basename(arquivo_servidor) 
+        pacote = b'BEGIN' + ("servidor_" + nome_arquivo_servidor).encode()
+
+        servidor.send(pacote)
+
+        while (dados := f.read(DATA_SIZE)):                                 
+            pacote = b'CHUNK' + dados # Cria o pacote com o ID da sessão e os dados do arquivo
+            servidor.send(pacote)
+            print(f"Enviado pacote {num_pacote}\n")
+            num_pacote += 1
+
+        servidor.send(b'FINAL')
+
+    servidor.close()

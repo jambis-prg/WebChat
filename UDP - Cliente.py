@@ -3,9 +3,11 @@ import struct
 import sys
 import os
 import math
+from sender import RDTSender
+from receiver import RDTReceiver
 
 BUFFER_SIZE = 1024
-HEADER_SIZE = 13
+HEADER_SIZE = 6
 DATA_SIZE = BUFFER_SIZE - HEADER_SIZE
 SERVER_ADDRESS = ('localhost', 12345)
 
@@ -49,65 +51,53 @@ def send_blocking(cliente, pacote):
 
     return data # Retornando pacote de reconhecimento
 
-cliente = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)              # Cria o socket UDP
-cliente.settimeout(2.0)                                                 # Define o timeout do socket para 2 segundos
+cliente = RDTSender(SERVER_ADDRESS, 2.0)
 
 # Envia o arquivo
 with open(arquivo_path, 'rb') as f:
-    max_pacotes = math.ceil(os.path.getsize(arquivo_path) / DATA_SIZE)   # Calcula o número máximo de pacotes
     num_pacote = 0
 
-    pacote = struct.pack('>5sI', b'BEGIN', max_pacotes)             # Cria o pacote de início com o nome do arquivo e número máximo de pacotes
-    pacote += ARQUIVO_LOCAL.encode() # Adiciona o nome do arquivo
-    id, = struct.unpack('>I', send_blocking(cliente=cliente, pacote=pacote)) # Obtendo o ID
+    pacote = b'BEGIN' + ARQUIVO_LOCAL.encode() # Adiciona o nome do arquivo
+
+    cliente.send(pacote)
 
     while (dados := f.read(DATA_SIZE)):                                 
-        cabecalho = struct.pack('>5s2I', b'CHUNK', id, num_pacote)
-        pacote = cabecalho + dados                                  # Cria o pacote com o ID da sessão e os dados do arquivo
-
-        # Garante que apenas envie o proximo pacote se for o ID da sessao atual
-        while True:
-            ack_id, = struct.unpack('>I', send_blocking(cliente=cliente, pacote=pacote))
-            if (ack_id == id):
-                break
-        
+        pacote = b'CHUNK' + dados # Cria o pacote com o ID da sessão e os dados do arquivo
+        cliente.send(pacote)
         print(f"Enviado pacote {num_pacote}\n")
         num_pacote += 1
+
+    cliente.send(b'FINAL')
+
+cliente.close()
+
+cliente = RDTReceiver(SERVER_ADDRESS)
 
 # Prepara para receber os pacotes numerados
 pacotes = {}
 print("Esperando pacotes")
 
-cliente.settimeout(None)                                                # Remove o temporizador para receber os pacotes
-
 num_pacote = 0
-waiting_packets = True
 
-# Garante o recebimento dos dados e garante que se o pacote de reconhecimento for perdido na transmissao
-# Como o servidor renviará o mesmo pacote msm o cliente tendo recebido o cliente apenas reenviará o pacote de reconhecimento
-# Garantindo que os dois não saim de sincronia
-while waiting_packets:
-    data, _ = cliente.recvfrom(BUFFER_SIZE) # Recebe pacote do servidor
-    cabecalho, sessao_id = struct.unpack('>5sI', data[:9]) # Lê cabecalho
-    if (cabecalho == b'CHUNK' and sessao_id == id): # Verifica se o servidor ja esta enviando os pacotes
-        indice, = struct.unpack('>I', data[9:13])
-        print(f"Recebido indice {indice}")
-        if (indice == num_pacote):
-            pacotes[num_pacote] = data[13:]
-            num_pacote += 1
-            print(f"{num_pacote}/{max_pacotes}")
-            if (num_pacote >= max_pacotes):
-                waiting_packets = False
-    elif (cabecalho == b'BEGIN' and sessao_id == id): # Verifica se o servidor iniciou a comunicao
-        novo_nome = str(data[9:].decode())
+pacote = cliente.receive()
+novo_nome = pacote[5:].decode()
 
-    ack_id = struct.pack('>I', sessao_id) # Prepara o pacote de reconhecimento
-    cliente.sendto(ack_id, SERVER_ADDRESS) # Enviado pacote de reconhecimento
+while True:
+    pacote = cliente.receive()
+    cabecalho, = struct.unpack('5s', pacote[:5])
+
+    if cabecalho == b'CHUNK':
+        pacotes[num_pacote] = pacote[5:]
+        num_pacote += 1
+    else:
+        break
+
+cliente.close()
     
 # Reordena os pacotes e salva o arquivo devolvido
 arquivo_retorno = os.path.join('Cliente', novo_nome)
 with open(arquivo_retorno, 'wb') as f:
-    for i in range(max_pacotes):
+    for i in range(num_pacote):
         f.write(pacotes[i])
 
 print(f"Arquivo devolvido salvo como: {arquivo_retorno}")
