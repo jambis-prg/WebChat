@@ -1,6 +1,7 @@
 import socket
 import struct
 import random
+from typing import Tuple
 from Simulador_de_rede import Simulador_de_Perdas
 
 class RDTReceiver:
@@ -29,7 +30,7 @@ class RDTReceiver:
     def close(self):
         self.sock.close()
 
-    def receive(self) -> bytes:
+    def receive(self) -> Tuple[bytes, Tuple[str, int]]:
         while True:
             pkt, addr = self.sock.recvfrom(2048)
             seq, payload = self._parse_packet(pkt)
@@ -43,7 +44,7 @@ class RDTReceiver:
                 ack = self._make_ack(seq)
                 self.sock.sendto(ack, addr)
                 self.expected_seq ^= 1
-                return payload
+                return payload, addr
             else:
                 print(f"[RDT] Pacote duplicado {seq}. Reenviando último ACK.")
                 ack = self._make_ack(1 - self.expected_seq)
