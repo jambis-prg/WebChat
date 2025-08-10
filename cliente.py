@@ -2,6 +2,7 @@ import socket
 import threading
 from sender import RDTSender
 from receiver import RDTReceiver
+from fullRDT import RDTFull
 
 def fixed_size_bytes_with_null(s, size, encoding='utf-8'):
     b = s.encode(encoding)
@@ -23,58 +24,52 @@ def fixed_size_bytes_with_null(s, size, encoding='utf-8'):
 #         except:
 #             break
 
-def receive_print(rdt_revice):
+def receive_print(client):
     while True:
         try:
-            data, _ = rdt_revice.receive()
+            data, _ = client.receive()
             if not data:
                 break
             print(data.decode(), end="")
         except:
             break
 
-NAME_MAX_LEN = 20
+HEADER = 16 #hi, meu nome eh <- possui 16 caracteres contando com o ultio espaco
+NAME_MAX_LEN = HEADER + 20
 
 def main():
-    # server_ip = input("Digite o IP do servidor: ")
-    server_ip = "127.0.0.1"
-    # server_port = int(input("Digite a porta do servidor: "))
-    server_port = 12346
+    server_ip = "0.0.0.0"
     
-    SERVER_ADDRESS = (server_ip, server_port)
-    # sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # sock.connect((server_ip, server_port))
-    sender = RDTSender(SERVER_ADDRESS, 2.0)
-    receiver = RDTReceiver(SERVER_ADDRESS, None)
-
-    sender.send(b"HI") # mensagem inicial para ele se indentificar
-    msg, _ = rdt_revice.receive()
-    print(data) # printando a msg para se identificar
+    SERVER_ADDRESS = (server_ip, 12345)
+    CLIENT_ADDRESS = (server_ip, 8080)
+    client = RDTFull(SERVER_ADDRESS, CLIENT_ADDRESS, 2.0)
+    client.send(b"HI") # mensagem inicial para ele se indentificar
+    msg, _ = client.receive()
+    print(msg) # printando a msg para se identificar
 
     while True:
-        name = fixed_size_bytes_with_null(input(), NAME_MAX_LEN)
-        sender.send(name)
-        msg, addr = receiver.receive()
+        msg = fixed_size_bytes_with_null(input(), NAME_MAX_LEN)
+        client.send(msg)
+        name = msg.split(b"hi, meu nome eh")[-1].strip() # melhorar esse split
+        msg, _ = client.receive()
         print(msg)
         if msg == b"Nome cadastrado.\n":
             break
     
     
-    threading.Thread(target=receive_print, args=(receiver,), daemon=True).start()
+    threading.Thread(target=receive_print, args=(client,), daemon=True).start()
 
     while True:
         try:
             msg = input()
             if msg.strip().lower() == "bye":
-                # sock.sendall(b"bye\n")
-                sender.sendto(name + b"bye\n", SERVER_ADDRESS)
+                client.send(name + b"bye\n", SERVER_ADDRESS)
                 break
-            # sock.sendall((msg + "\n").encode())
-            sender.sendto(name + msg.encode() + b"\n")
+            client.send(name + msg.encode() + b"\n")
         except:
             break
 
-    # sock.close()
+    client.close()
 
 
 if __name__ == "__main__":
