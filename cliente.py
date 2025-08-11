@@ -13,16 +13,6 @@ def fixed_size_bytes_with_null(s, size, encoding='utf-8'):
         # preenche com null bytes até size total, sempre terminando com \0
         b = b + b'\0' + b'\0' * (size - len(b) - 1)
     return b
-    
-# def receive(sock):
-#     while True:
-#         try:
-#             data = sock.recv(1024)
-#             if not data:
-#                 break
-#             print(data.decode(), end="")
-#         except:
-#             break
 
 def receive_print(client):
     while True:
@@ -45,14 +35,14 @@ def main():
     client = RDTFull(SERVER_ADDRESS, CLIENT_ADDRESS, 2.0)
     client.send(b"HI") # mensagem inicial para ele se indentificar
     msg, _ = client.receive()
-    print(msg) # printando a msg para se identificar
+    print(msg.decode()) # printando a msg para se identificar
 
     while True:
         msg = fixed_size_bytes_with_null(input(), NAME_MAX_LEN)
         client.send(msg)
         name = msg.split(b"hi, meu nome eh")[-1].strip() # melhorar esse split
         msg, _ = client.receive()
-        print(msg)
+        print(msg.decode())
         if msg == b"Nome cadastrado.\n":
             break
     
@@ -62,10 +52,9 @@ def main():
     while True:
         try:
             msg = input()
-            if msg.strip().lower() == "bye":
-                client.send(name + b"bye\n", SERVER_ADDRESS)
-                break
             client.send(name + msg.encode() + b"\n")
+            if msg.strip() == "bye":
+                break
         except:
             break
 

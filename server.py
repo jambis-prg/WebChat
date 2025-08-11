@@ -4,6 +4,7 @@ import datetime
 import random
 from sender import RDTSender
 from receiver import RDTReceiver
+from serverRDT import RDTServer
 from typing import Tuple
 
 def gen_random():
@@ -11,94 +12,75 @@ def gen_random():
     max_value = 2**(8*N) - 1  # máximo para N bytes
     
     num = random.randint(0, max_value)
-    print(num)
+    # print(num)
     return num.to_bytes(N, byteorder='big')
 
-clients = {}
-names = set()
+names = {}
 friend_lists = {}
 ban_votes = {}
-
-def broadcast(message, exclude=None):
-    for addr, sender in clients.items():
-        try:
-            print(f'{addr} x {exclude}')
-            if addr != exclude:
-                sender.send(message.encode())
-        except Exception as e:
-            print(e)
-            pass
 
 def format_msg(addr, user, msg):
     now = datetime.datetime.now().strftime("%H:%M:%S %d/%m/%Y")
     return f"{addr[0]}:{addr[1]}/~{user}: {msg} {now}"
 
 SERVER_ADDRESS = ("0.0.0.0", 12345)
+
 def main():
-    servidor = RDTReceiver(SERVER_ADDRESS, None)
-    # server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # server.bind((SERVER_ADDRESS, 12345)) 
-    # server.listen()
+    server = RDTServer(SERVER_ADDRESS, 2.0)
     print("Servidor ouvindo na porta 12345...")
 
     while True:
-        # conn, addr = server.accept()
-        msg, addr = servidor.receive()
+        msg, addr = server.receive()
 
-        if (addr in clients.keys()):
-            cliente = clients[addr]
-        else:
-            cliente = RDTSender(addr, 2.0)
-            clients[addr] = cliente
-        
-        # se ele esta iniciando a conversa
-        # se ele ja esta logado
-        # threading.Thread(target=handle_client, args=(
-        #     conn, addr), daemon=True).start()
-        
         # se for um HI, ele vai mandar a mensagem para se identificar e esperar um nome
         if msg == b"HI":
-            cliente.send(b"Identifique-se com: hi, meu nome eh <nome>\n")  
+            server.send(b"Identifique-se com: hi, meu nome eh <nome>\n", addr)  
+            continue
         elif msg.startswith(b"hi, meu nome eh"):
-                name_candidate = msg.split(b"hi, meu nome eh")[-1].strip() # melhorar esse split
-                if name_candidate in names:
-                    cliente.send(b"Nome ja em uso.\n")
+                name_candidate = msg.split(b"hi, meu nome eh")[-1].strip().decode() # melhorar esse split
+                if name_candidate in names.keys():
+                    server.send(b"Nome ja em uso.\n", addr)
                 else:
-                    cliente.send(b"Nome cadastrado.\n")
-                    name = name_candidate
-                    names.add(name)
-                    friend_lists[name] = set()
-                    broadcast(f"[Servidor] {
-                              name} entrou na sala.\n", exclude=addr)
+                    server.send(b"Nome cadastrado.\n", addr)
+                    names[name_candidate] = addr
+                    friend_lists[name_candidate] = set()
+                    server.broadcast(f"[Servidor] {name_candidate} entrou na sala.\n", exclude=addr)
                 continue
         
         nome = msg[:20].decode()
         msg = msg[20:].decode()
         
-        if msg == "bye":
-            del clients[addr]
-            del friend_lists[nome]
+        if msg.startswith("bye"):
+            server.remove_addr(addr)
+            server.broadcast(f"[Servidor] {nome} saiu da sala.\n")
+            _ = friend_lists.pop(nome, None)
+            _ = names.pop(nome, None)
+            _ = ban_votes.pop(nome, None)
+            # names.pop(nome)
+            # if (nome in ban_votes.keys())
+            #     ban_votes.pop(nome)
             
-        elif msg == "list":
-            user_list = "\n".join(names.values()) + "\n"
-            cliente.send(user_list.encode())
+        elif msg.startswith("list"):
+            print("comando list recebido")
+            user_list = "List:" + "\n".join(names.keys()) + "\n"
+            server.send(user_list.encode(), addr)
             
-        elif msg == "mylist":
-            amigos = "\n".join(friend_lists[nome]) + "\n"
-            cliente.send(amigos.encode())
+        elif msg.startswith("mylist"):
+            amigos = "MyList:" + "\n".join(friend_lists[nome]) + "\n"
+            server.send(amigos.encode(), addr)
             
         elif msg.startswith("addtomylist"):
             parts = msg.split()
             if len(parts) > 1:
                 if parts[1] not in names.keys():
-                    cliente.send("Essa pessoa nao esta cadastrada.\n".encode())
+                    server.send("Essa pessoa nao esta cadastrada.\n".encode(), addr)
                 friend_lists[nome].add(parts[1])
                 
         elif msg.startswith("rmvfrommylist"):
             parts = msg.split()
             if len(parts) > 1:
                 if parts[1] not in names.keys():
-                    cliente.send("Essa pessoa nao esta cadastrada.\n".encode())
+                    server.send("Essa pessoa nao esta cadastrada.\n".encode(), addr)
                 friend_lists[nome].discard(parts[1])
                 
         elif msg.startswith("ban"):
@@ -107,7 +89,7 @@ def main():
                 target = parts[1]
                 
                 if target not in names.keys():
-                    cliente.send("Essa pessoa nao esta cadastrada.\n".encode())
+                    server.send("Essa pessoa nao esta cadastrada.\n".encode(), addr)
                 
                 if target not in ban_votes:
                     ban_votes[target] = set()
@@ -115,20 +97,20 @@ def main():
                 ban_votes[target].add(nome)
                 vote_count = len(ban_votes[target])
                 needed = len(names) // 2 + 1
-                broadcast(f"[Servidor] {nome} ban {vote_count}/{needed}\n")
+                server.broadcast(f"[Servidor] {nome} ban {vote_count}/{needed}\n")
                 
                 if vote_count > needed:
-                    banned_usr = clients[target]
-                    banned_usr.send(b"[Servidor] Voce foi banido.\n")
-                    del clients[target]
-                    del ban_votes[target]
-                    del friend_lists[target]
-                    names.discard(target)
+                    banned_usr_addr = names[target]
+                    server.send(b"[Servidor] Voce foi banido.\n", banned_usr_addr)
+                    server.remove_addr(banned_usr_addr)
+                    ban_votes.pop(target)
+                    friend_lists.pop(target)
+                    names.pop(target)
+                    
                     for i in friend_lists.values():
                         i.discart(target)
         else:
-            broadcast(format_msg(addr, nome, msg) +
-                      "\n", exclude=addr)
+            server.broadcast(format_msg(addr, nome, msg) + "\n", exclude=addr)
         
         
 
