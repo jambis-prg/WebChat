@@ -110,6 +110,7 @@ def main():
                     for i in friend_lists.values():
                         i.discart(target)
         else:
+            print(msg)
             server.broadcast(format_msg(addr, nome, msg) + "\n", exclude=addr)
         
         

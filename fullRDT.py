@@ -13,10 +13,10 @@ class RDTFull:
         self.expected_seq = 0
         self.timeout = timeout
 
-    def _make_ack(self, seq: int) -> bytes:
+    def _make_ack(self, seq: bool) -> bytes:
         return struct.pack('B', seq)
         
-    def _make_packet(self, seq: int, payload: bytes) -> bytes:
+    def _make_packet(self, seq: bool, payload: bytes) -> bytes:
         return struct.pack('B', seq) + payload
 
     def _parse_ack(self, data: bytes):
@@ -26,11 +26,15 @@ class RDTFull:
         return seq
     
     def _parse_packet(self, pkt: bytes):
-        if len(pkt) < 3:
-            return None, None, False
+        if len(pkt) < 1:
+            return None, None
         seq, = struct.unpack("B", pkt[:1])
-        payload = pkt[1:]
-        return seq, payload
+
+        if len(pkt) > 1:
+            payload = pkt[1:]
+            return seq, payload
+
+        return seq, None
 
     def send(self, data: bytes):
         pkt = self._make_packet(self.seq, data)

@@ -16,10 +16,10 @@ class RDTServer:
         self.expected_seqs = {}
         self.timeout = timeout
 
-    def _make_ack(self, seq: int) -> bytes:
+    def _make_ack(self, seq: bool) -> bytes:
         return struct.pack('B', seq)
         
-    def _make_packet(self, seq: int, payload: bytes) -> bytes:
+    def _make_packet(self, seq: bool, payload: bytes) -> bytes:
         return struct.pack('B', seq) + payload
 
     def _parse_ack(self, data: bytes):
@@ -29,11 +29,15 @@ class RDTServer:
         return seq
     
     def _parse_packet(self, pkt: bytes):
-        if len(pkt) < 3:
-            return None, None, False
+        if len(pkt) < 1:
+            return None, None
         seq, = struct.unpack("B", pkt[:1])
-        payload = pkt[1:]
-        return seq, payload
+
+        if len(pkt) > 1:
+            payload = pkt[1:]
+            return seq, payload
+
+        return seq, None
 
     def send(self, data: bytes, addr):
         seq = self.seqs.get(addr, 0)
@@ -44,7 +48,7 @@ class RDTServer:
 
         while True:
             self.sock.sendto(pkt, addr)
-            print(f"[RDT] Pacote {seq} enviado.")
+            print(f"[RDT] Pacote {seq} enviado para {addr}.")
 
             start_time = time.time()
             while True:
@@ -56,10 +60,14 @@ class RDTServer:
 
                 self.sock.settimeout(remaining)
                 try:
-                    ack_data, _ = self.sock.recvfrom(1024)
+                    ack_data, addr_resposta = self.sock.recvfrom(1024)
+
+                    if addr_resposta != addr:
+                        continue
+                    
                     ack_seq = self._parse_ack(ack_data)
                     if ack_seq == seq:
-                        print(f"[RDT] ACK {ack_seq} recebido corretamente.")
+                        print(f"[RDT] ACK {ack_seq} recebido corretamente de {addr}.")
                         self.seqs[addr] ^= 1
                         return  # sucesso
                     else:
@@ -79,15 +87,14 @@ class RDTServer:
                 
                 seq, payload = self._parse_packet(pkt)
 
+                ack = self._make_ack(seq)
                 if seq == expected_seq:
                     print(f"[RDT] Pacote {seq} recebido corretamente.")
-                    ack = self._make_ack(seq)
                     self.sock.sendto(ack, addr)
                     self.expected_seqs[addr] ^= 1
                     return payload, addr
                 else:
                     print(f"[RDT] Pacote duplicado {seq}. Reenviando último ACK.")
-                    ack = self._make_ack(1 - expected_seq)
                     self.sock.sendto(ack, addr)
             except socket.timeout:
                 continue
