@@ -10,6 +10,8 @@ from typing import Tuple
 class RDTServer:
     def __init__(self, listen_addr, timeout=1.0):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
         self.sock.bind(listen_addr)
 
         self.seqs = {}

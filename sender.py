@@ -5,6 +5,8 @@ import time
 class RDTSender:
     def __init__(self, receiver_addr, timeout=1.0):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
         self.receiver_addr = receiver_addr
         self.seq = 0
         self.timeout = timeout

@@ -7,6 +7,8 @@ from Simulador_de_rede import Simulador_de_Perdas
 class RDTReceiver:
     def __init__(self, listen_addr, simu_rede=None):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
         self.sock.bind(listen_addr)
         self.expected_seq = 0
         

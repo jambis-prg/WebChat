@@ -23,16 +23,19 @@ def receive_print(client):
     while True:
         try:
             with lock:
-                print("entrou no lock")
+                print("esperando dados")
                 data, _ = client.receive()
+                _msg = data
 
-                if not data:
-                    continue
-
+            if not data:
+                # _msg = ""
+                print("vazio")
+                continue
+            print(f"msg___{_msg}")
+            if _msg == b"Nome cadastrado.\n":
                 print("acorda fdp")
                 msg_event.set()  # Notifica que chegou mensagem
-                _msg = data
-                print(data.decode(), end="")
+            print(data.decode(), end="")
         except Exception as e:
             print(e)
             break
@@ -57,10 +60,11 @@ def main():
         name = msg.split(b"hi, meu nome eh")[-1].strip() # melhorar esse split
         client.send(msg)
 
+        print("esperando")
         msg_event.wait()
 
         print("acordou")
-        print(f"-{_msg}")
+        print(f"msg: {_msg.decode()}")
         if _msg == b"Nome cadastrado.\n":
             break
 
