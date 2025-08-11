@@ -1,11 +1,6 @@
-import socket
-import threading
 import datetime
 import random
-from sender import RDTSender
-from receiver import RDTReceiver
 from serverRDT import RDTServer
-from typing import Tuple
 
 def gen_random():
     N = 4  # número de bytes

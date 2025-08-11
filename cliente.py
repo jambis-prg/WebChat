@@ -1,7 +1,4 @@
-import socket
 import threading
-from sender import RDTSender
-from receiver import RDTReceiver
 from fullRDT import RDTFull
 
 def fixed_size_bytes_with_null(s, size, encoding='utf-8'):
