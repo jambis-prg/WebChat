@@ -14,27 +14,26 @@ def fixed_size_bytes_with_null(s, size, encoding='utf-8'):
         b = b + b'\0' + b'\0' * (size - len(b) - 1)
     return b
 
-lock = threading.Lock()
-_msg = None
 msg_event = threading.Event()
+logged = False
 
 def receive_print(client):
-    global _msg, msg_event
+    global logged, msg_event
     while True:
         try:
-            with lock:
-                print("esperando dados")
-                data, _ = client.receive()
-                _msg = data
+            print("esperando dados")
+            data, _ = client.receive()
 
             if not data:
-                # _msg = ""
                 print("vazio")
                 continue
-            print(f"msg___{_msg}")
-            if _msg == b"Nome cadastrado.\n":
-                print("acorda fdp")
+
+            if data == b"Nome cadastrado.\n":
+                logged = True
                 msg_event.set()  # Notifica que chegou mensagem
+            elif data == b"Nome ja em uso.\n":
+                msg_event.set()
+
             print(data.decode(), end="")
         except Exception as e:
             print(e)
@@ -45,7 +44,7 @@ HEADER = 16 # hi, meu nome eh <- possui 16 caracteres contando com o ultimo espa
 NAME_MAX_LEN = HEADER + 20
 
 def main():
-    global _msg, msg_event
+    global logged, msg_event
     server_ip = "0.0.0.0"
     
     SERVER_ADDRESS = (server_ip, 12345)
@@ -64,8 +63,7 @@ def main():
         msg_event.wait()
 
         print("acordou")
-        print(f"msg: {_msg.decode()}")
-        if _msg == b"Nome cadastrado.\n":
+        if logged:
             break
 
     print("Comecando programa")

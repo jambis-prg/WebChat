@@ -88,7 +88,7 @@ class RDTServer:
                 seq, payload = self._parse_packet(pkt)
 
                 ack = self._make_ack(seq)
-                if seq == expected_seq:
+                if seq == expected_seq and payload:
                     print(f"[RDT] Pacote {seq} recebido corretamente.")
                     self.sock.sendto(ack, addr)
                     self.expected_seqs[addr] ^= 1
