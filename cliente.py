@@ -63,15 +63,18 @@ def main():
     recv_thread = threading.Thread(target=receive_print, args=(client,), daemon=True)
     recv_thread.start()
 
-
+    # uma saida elegante e que ainda sai da sala caso de ctrl+C
     def handler(sig, frame):
         print("\n[!] Ctrl+C detectado, encerrando conexão...")
+        client.send(name + "bye".encode() + b"\n")
         sys.exit(0)
         
 
     signal.signal(signal.SIGINT, handler)
     # Aguardar confirmação do servidor
     while True:
+        # esta dentro do loop para caso ele tente cadastrar um nome ja em uso
+        # ai ele tenta novamente
         client.send(b"HI") # mensagem inicial para indentificação do usuário
         msg = fixed_size_bytes_with_null(input(), NAME_MAX_LEN)
         name = msg.split(b"hi, meu nome eh")[-1].strip()

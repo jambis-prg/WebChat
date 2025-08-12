@@ -1,10 +1,19 @@
 import datetime
 import random
 from serverRDT import RDTServer
+import signal
+import sys
 
 names = {}          # nome_usuario -> endereço (IP, porta)
 friend_lists = {}   # nome_usuario -> conjunto de amigos (nomes)
 ban_votes = {}      # nome_usuario -> conjunto de nomes votados para banir
+
+def handler(sig, frame):
+        print("\n[!] Ctrl+C detectado, encerrando servidor...")
+        sys.exit(0)
+        
+
+signal.signal(signal.SIGINT, handler)
 
 SERVER_ADDRESS = ("0.0.0.0", 12345)
 
