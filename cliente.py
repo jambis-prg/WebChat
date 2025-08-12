@@ -43,7 +43,11 @@ def receive_print(client):
             print(e)
             break
 
-    # print("saiu do receive")
+# Uma saida elegante e que ainda sai da sala caso de ctrl+C
+def handler(client, name, sig, frame):
+    print("\n[!] Ctrl+C detectado, encerrando conexão...")
+    client.send(name + "bye".encode() + b"\n")
+    sys.exit(0)
 
 # Tamanho máximo da mensagem de identificação (16 bytes do texto + 20 para o nome)
 HEADER = 16 # hi, meu nome eh <- possui 16 caracteres contando com o ultimo espaco
@@ -62,31 +66,19 @@ def main():
     recv_thread = threading.Thread(target=receive_print, args=(client,), daemon=True)
     recv_thread.start()
 
-    # uma saida elegante e que ainda sai da sala caso de ctrl+C
-    def handler(sig, frame):
-        print("\n[!] Ctrl+C detectado, encerrando conexão...")
-        client.send(name + "bye".encode() + b"\n")
-        sys.exit(0)
-        
-
     signal.signal(signal.SIGINT, handler)
-    # Aguardar confirmação do servidor
+    # Aguardar confirmação do servidor (se mantém no loop caso tentem cadastrar um nome já em uso)
     while True:
-        # esta dentro do loop para caso ele tente cadastrar um nome ja em uso
-        # ai ele tenta novamente
         client.send(b"HI") # mensagem inicial para indentificação do usuário
         msg = fixed_size_bytes_with_null(input(), NAME_MAX_LEN)
         name = msg.split(b"hi, meu nome eh")[-1].strip()
-        client.send(msg)
 
-        # print("esperando")
+        client.send(msg)
         msg_event.wait()
-        # print("acordou")
 
         if logged:
             break
 
-    print("Entrando no chat")
     # Loop principal do chat, envia mensagens para o servidor
     while True:
         try:
