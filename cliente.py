@@ -1,4 +1,6 @@
 import threading
+import sys
+import signal
 from fullRDT import RDTFull
 
 def fixed_size_bytes_with_null(s, size, encoding='utf-8'):
@@ -20,12 +22,12 @@ def receive_print(client):
 
     while True:
         try:
-            print("esperando dados")
+            # print("esperando dados")
             # Recebe dados do servidor (bloqueia até receber)
             data, _ = client.receive()
 
             if not data:
-                print("vazio")
+                # print("vazio")
                 continue
 
             # Sinaliza quando o servidor confirmou cadastro ou nome em uso
@@ -41,7 +43,7 @@ def receive_print(client):
             print(e)
             break
 
-    print("saiu do receive")
+    # print("saiu do receive")
 
 # Tamanho máximo da mensagem de identificação (16 bytes do texto + 20 para o nome)
 HEADER = 16 # hi, meu nome eh <- possui 16 caracteres contando com o ultimo espaco
@@ -52,25 +54,35 @@ def main():
     server_ip = "0.0.0.0"
     
     SERVER_ADDRESS = (server_ip, 12345)
-    CLIENT_ADDRESS = (server_ip, 8080)
+    CLIENT_ADDRESS = (server_ip, 0)
 
     client = RDTFull(SERVER_ADDRESS, CLIENT_ADDRESS, 2.0)
+    print(f"Cliente rodando na porta {client.get_port_number()}")
 
     # Thread para receber mensagens sem bloquear o fluxo principal
-    recv_thread = threading.Thread(target=receive_print, args=(client,))
+    recv_thread = threading.Thread(target=receive_print, args=(client,), daemon=True)
     recv_thread.start()
 
-    client.send(b"HI") # mensagem inicial para indentificação do usuário
+    # uma saida elegante e que ainda sai da sala caso de ctrl+C
+    def handler(sig, frame):
+        print("\n[!] Ctrl+C detectado, encerrando conexão...")
+        client.send(name + "bye".encode() + b"\n")
+        sys.exit(0)
+        
 
+    signal.signal(signal.SIGINT, handler)
     # Aguardar confirmação do servidor
     while True:
+        # esta dentro do loop para caso ele tente cadastrar um nome ja em uso
+        # ai ele tenta novamente
+        client.send(b"HI") # mensagem inicial para indentificação do usuário
         msg = fixed_size_bytes_with_null(input(), NAME_MAX_LEN)
         name = msg.split(b"hi, meu nome eh")[-1].strip()
         client.send(msg)
 
-        print("esperando")
+        # print("esperando")
         msg_event.wait()
-        print("acordou")
+        # print("acordou")
 
         if logged:
             break
@@ -87,8 +99,9 @@ def main():
         except:
             break
 
-    recv_thread.join() # Esperar a thread terminar
+    # recv_thread.join() # Esperar a thread terminar
     client.close()
+    sys.exit(0)
 
 if __name__ == "__main__":
     main()

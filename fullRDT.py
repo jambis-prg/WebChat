@@ -88,3 +88,6 @@ class RDTFull:
 
     def close(self):
         self.sock.close()
+    
+    def get_port_number(self):
+        return self.sock.getsockname()[1]
