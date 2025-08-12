@@ -1,27 +1,23 @@
-# Transferência de Arquivos com UDP - Segunda Etapa
+# Chat de Sala Única com UDP - Terceira Etapa
 
-Este projeto implementa a segunda etapa do projeto da disciplina de Infraestrutura de Comunicações - IF678 2025.1, desenvolvendo uma ferramenta de transferência de arquivos utilizando comunicação UDP com a biblioteca Socket em Python.
+Este projeto implementa a terceira etapa do projeto da disciplina de Infraestrutura de Comunicações - IF678 2025.1, desenvolvendo um sistema de chat de sala única utilizando comunicação UDP com a biblioteca Socket em Python e protocolo RDT (Reliable Data Transfer) implementado na camada de aplicação.
 
 ## Objetivo
 
-Desenvolver um sistema cliente-servidor para transferência de arquivos utilizando o protocolo UDP com **confiabilidade implementada na camada de aplicação**, onde o cliente envia um arquivo ao servidor, que o armazena e o devolve modificado (com nome alterado) ao cliente. Essa etapa adiciona mecanismos de confiabilidade como controle de sequência, acknowledgments (ACKs), timeouts e retransmissões.
+Desenvolver um sistema cliente-servidor para chat em sala única utilizando o protocolo UDP com **confiabilidade implementada na camada de aplicação**, onde múltiplos clientes podem se conectar ao servidor e trocar mensagens. O sistema implementa funcionalidades como lista de amigos e sistema de banimento por votação
 
 ## Estrutura do Projeto
 
 ### Arquivos Principais
 
-- **`UDP - Cliente.py`**: Implementação do cliente UDP responsável por enviar arquivos ao servidor e receber a devolução utilizando RDT;
-- **`UDP - Servidor.py`**: Implementação do servidor UDP que recebe, armazena e devolve arquivos aos clientes utilizando RDT;
-- **`sender.py`**: Classe `RDTSender` que implementa o protocolo de transferência confiável no lado do remetente;
-- **`receiver.py`**: Classe `RDTReceiver` que implementa o protocolo de transferência confiável no lado do receptor;
-- **`Simulador_de_rede.py`**: Classe `Simulador_de_Perdas` para simulação configurável de condições de rede (perda de pacotes);
-- **`sample/`**: Diretório contendo arquivos de exemplo para teste (deve ser criado pelo usuário);
-- **`Cliente/`**: Diretório criado automaticamente para armazenar arquivos devolvidos pelo servidor;
-- **`Servidor/`**: Diretório criado automaticamente para armazenar arquivos recebidos dos clientes;
+- **`client.py`**: Implementação do cliente de chat que se conecta ao servidor;
+- **`server.py`**: Implementação do servidor que gerencia as conexões e distribui as mensagens;
+- **`clienteRDT.py`**: Classe `RDTFull` que implementa o protocolo de transferência confiável para o cliente;
+- **`serverRDT.py`**: Classe `RDTServer` que implementa o protocolo de transferência confiável para o servidor;
 
 ## Funcionalidades Implementadas
 
-### Primeira Etapa
+### Primeira Etapa - Transferência de Arquivos
 - ✅ Comunicação UDP utilizando a biblioteca Socket do Python;
 - ✅ Envio de arquivos em pacotes de até 1024 bytes (buffer_size);
 - ✅ Recepção e armazenamento de arquivos no servidor;
@@ -37,80 +33,67 @@ Desenvolver um sistema cliente-servidor para transferência de arquivos utilizan
 - ✅ **Simulação de Perda**: Simulação configurável de perda de pacotes via linha de comando com taxa fixa ou aleatória;
 - ✅ **Confiabilidade sobre UDP**: Transferência confiável utilizando protocolo não-confiável;
 
+### Terceira Etapa - Chat de Sala Única
+- ✅ **Sistema de Identificação**: Cadastro de usuários com nomes únicos;
+- ✅ **Chat em Sala Única**: Todos os usuários cadastrados podem enviar e receber mensagens;
+- ✅ **Lista de Amigos**: Cada usuário pode criar e gerenciar sua lista de contatos;
+- ✅ **Identificação de Amigos**: Mensagens de amigos são destacadas com `[amigo]`;
+- ✅ **Sistema de Banimento**: Votação para remoção de usuários da sala;
+- ✅ **Notificações**: Avisos de entrada e saída de usuários;
+- ✅ **Visualização de Usuários**: Comando para listar todos os participantes da sala;
+
 ## Requisitos
 
 - **Linguagem**: Python 3.6 ou superior;
-- **Bibliotecas**: socket, struct, os, sys (bibliotecas padrão do Python);
+- **Bibliotecas**: socket, struct, threading, sys, signal, datetime (bibliotecas padrão do Python);
 - **Sistema Operacional**: Linux, Windows;
 
 ## Como Executar
 
-### 1. Preparação do Ambiente
-
-Após baixar o repositório, adicione arquivos para teste no diretório `sample/`. Já existem alguns arquivos de teste na pasta `sample/`;
-
-### 2. Executar o Servidor
+### 1. Executar o Servidor
 
 Em um terminal, execute:
 ```bash
-python "UDP - Servidor.py"
+python "server.py"
 ```
+O servidor iniciará e ficará aguardando conexões na porta 12345.
 
-Para configurar uma taxa específica de perda de pacotes:
+### 2. Executar o Cliente
+
+Em um terminal, execute:
 ```bash
-python "UDP - Servidor.py" --loss-rate=0.05          # Taxa fixa de 5%
-python "UDP - Servidor.py" --loss 0.1                # Taxa fixa de 10%
-python "UDP - Servidor.py" --random-range=0.02-0.08  # Taxa aleatória entre 2%-8%
+python "client.py"
 ```
+O cliente solicitará o IP do servidor:
+```
+Digite o IP do servidor:
+```
+Verifique o IP do Servidor e digite para prosseguir.
 
-Por padrão a taxa de perda é um valor aleatório entre 0% e 2%; O servidor iniciará e ficará aguardando conexões na porta 12345;
+### 3. Identificação no Sistema
 
-### 3. Executar o Cliente
-
-Em outro terminal, execute:
+Após conectar-se, o servidor solicitará a identificação do usuário:
 ```bash
-python "UDP - Cliente.py" <nome_do_arquivo>
+Identifique-se com: hi, meu nome eh <nome>
 ```
-
-Para configurar uma taxa específica de perda de pacotes:
-```bash
-python "UDP - Cliente.py" arquivo.txt --loss-rate=0.03          # Taxa fixa de 3%
-python "UDP - Cliente.py" arquivo.txt --loss 0.08               # Taxa fixa de 8%
-python "UDP - Cliente.py" arquivo.txt --random-range=0.01-0.12  # Taxa aleatória entre 1%-12%
-```
-
-Por padrão a taxa de perda é um valor aleatório entre 0% e 2%; O arquivo deve ser algum localizado na pasta `sample\`;
+Digite a mensagem de identificação com seu nome desejado:
 
 **Exemplo:**
 ```bash
-python "UDP - Cliente.py" txtsample1.txt                           # Taxa aleatória
-python "UDP - Cliente.py" jpgsample1.jpg --loss-rate=0.05          # Taxa fixa de 5%
-python "UDP - Cliente.py" pngsample1.png --loss 0.02               # Taxa fixa de 2%
-python "UDP - Cliente.py" pdfsample1.pdf --random-range=0.03-0.15  # Taxa aleatória 3%-15%
+hi, meu nome eh Renato
 ```
+Caso o nome já esteja em uso, será solicitado outro nome.
 
-### 4. Verificar os Resultados
+### 4. Comandos Disponíveis
 
-- O arquivo enviado será salvo no diretório `Servidor/`, que é criado assim que executar o Servidor;
-- O arquivo devolvido será salvo no diretório `Cliente/`, também criado assim que executar o Cliente, com o prefixo `servidor_`;
-
-### 5. Monitorar Logs RDT
-
-Durante a execução, o sistema exibirá logs detalhados do protocolo RDT:
-```
-[RDT] Pacote 0 enviado.
-[RDT] ACK 0 recebido corretamente.
-[RDT] Pacote 1 enviado.
-[RDT] Timeout expirado. Retransmitindo...
-[RDT] Pacote 1 enviado.
-[RDT] ACK 1 recebido corretamente.
-```
-
-Estes logs ajudam a monitorar:
-- Envio e recebimento de pacotes;
-- Timeouts e retransmissões;
-- Simulação de perdas;
-- Detecção de duplicatas;
+No chat, você pode utilizar os seguintes comandos:
+- `bye` - Sair do chat;
+- `list` - Listar todos os usuários conectados;
+- `mylist` - Mostrar sua lista de amigos;
+- `addtomylist <nome>` - Adicionar um usuário à sua lista de amigos;
+- `rmvfrommylist <nome>` - Remover um usuário da sua lista de amigos;
+- `ban <nome>` - Votar para banir um usuário da sala;
+Qualquer outra mensagem será enviada para todos os usuários da sala.
 
 ## Detalhes Técnicos
 
@@ -128,56 +111,44 @@ Estes logs ajudam a monitorar:
    - **Timeout**: Retransmite o último pacote enviado;
    - **ACK Duplicado**: Ignora ACKs de sequências antigas;
    - **Pacote Duplicado**: Reenvia último ACK sem entregar dados;
-5. **Simulação de Perdas**: Taxa configurável via linha de comando (padrão: aleatória entre 0%-10%);
 
-### Estrutura dos Pacotes RDT
+### Estrutura do Sistema de Chat
 
-- **Cabeçalho RDT**: 1 byte contendo o número de sequência (0 ou 1);
-- **Cabeçalho Aplicação**: 5 bytes identificando tipo do pacote (BEGIN, CHUNK, FINAL);
-- **ACK**: 1 byte contendo número de sequência confirmado;
-- **Dados**: Restante do payload (até 1018 bytes para dados de arquivo);
+- **Identificação do Cliente**:
+   - Clientes se identificam com `hi, meu nome eh <nome>`;
+   - O servidor verifica se o nome já está em uso;
+
+- **Formato das Mensagens**:
+   - As mensagens são exibidas no formato: `IP:PORTA/~[amigo]NOME: MENSAGEM HORA DATA`;
+   - Mensagens de amigos são identificadas com o prefixo `[amigo]`;
+
+- **Sistema de Banimento**:
+   - A votação para banimento requer maioria simples (50% + 1);
+   - O usuário banido é removido da sala imediatamente;
+
+- **Manutenção de Conexões**:
+   - O servidor mantém registro de todos os endereços e seus respectivos nomes;
+   - Ao sair (`bye`), os registros são removidos automaticamente;
 
 ### Classes RDT Implementadas
 
-#### RDTSender
-- `send(data)`: Envia dados com garantia de entrega;
-- `_make_packet(seq, payload)`: Cria pacote com número de sequência;
-- `_parse_ack(data)`: Analisa pacotes de ACK recebidos;
-
-#### RDTReceiver  
+#### RDTServer
+- `send(data, addr)`: Envia dados com garantia de entrega para um endereço;
 - `receive()`: Recebe dados garantindo ordem e integridade;
-- `_make_ack(seq)`: Cria pacote de acknowledgment;
-- `_parse_packet(pkt)`: Analisa pacotes recebidos;
-
-#### Simulador_de_rede
-- `__init__(loss_rate)`: Inicializa simulador com taxa de perda especificada;
-- `drop_packet()`: Determina aleatoriamente se um pacote deve ser descartado;
-- `simula_perda_de_pacote(info)`: Simula perda e exibe logs de debug;
-- `recolher_taxa_dos_argumentos()`: Extrai taxa de perda dos argumentos ou gera valor aleatório;
-
-### Simulação de Perda Aleatória
-
-O sistema possui três modos de simulação de perda:
-
-1. **Taxa Aleatória (Padrão)**: Se nenhum parâmetro for especificado, gera uma taxa aleatória entre 0% e 2%
-2. **Taxa Fixa**: Especificada via `--loss-rate=X.XX` ou `--loss X.XX`
-3. **Faixa Aleatória Personalizada**: Especificada via `--random-range=X.XX-Y.YY`
-
-**Características da aleatoriedade:**
-- Cada execução gera uma taxa diferente (exceto se especificada)
-- A decisão de perda para cada pacote é independente e aleatória
-- Distribuição uniforme dentro da faixa especificada
+- `broadcast(message, exclude)`: Transmite mensagem para todos os clientes;
+- `broadcast_to_registered(message, names, exclude_addr)`: Transmite mensagem para todos os clientes registrados;
+#### RDTFull
+- `send(data)`: Envia dados com garantia de entrega;
+- `receive()`: Recebe dados garantindo ordem e integridade;
 
 ## Testes Realizados
 
 O sistema foi testado com:
-- ✅ Arquivos de texto (.txt);
-- ✅ Imagens (.jpg, .png);
-- ✅ Documentos (.pdf);
-- ✅ **Simulação de Perda de Pacotes**: Testado com perda artificial de 2%;
-- ✅ **Timeout e Retransmissão**: Verificado comportamento com diferentes valores de timeout;
-- ✅ **Transferência Confiável**: Garantia de integridade dos arquivos transferidos;
-- ✅ **Detecção de Duplicatas**: Tratamento correto de pacotes duplicados;
+- ✅ Múltiplas conexões simultâneas (4 conexões simultâneas em máquinas diferentes na mesma rede);
+- ✅ Teste de envio e recebimento de mensagens em grupo;
+- ✅ Gerenciamento de lista de amigos;
+- ✅ Sistema de votação para banimento;
+- ✅ Confiabilidade na entrega de mensagens;
 
 ## Colaboradores
 

@@ -1,8 +1,9 @@
 import threading
 import sys
 import signal
-from fullRDT import RDTFull
+from clientRDT import RDTFull
 
+# Função para criar uma representação em bytes de tamanho fixo com null-termination
 def fixed_size_bytes_with_null(s, size, encoding='utf-8'):
     b = s.encode(encoding)
     if len(b) >= size:
@@ -17,17 +18,16 @@ msg_event = threading.Event()
 # Flag para indicar se o nome foi cadastrado com sucesso
 logged = False
 
+# Função para receber e imprimir mensagens do servidor
 def receive_print(client):
-    global logged, msg_event
+    global logged, msg_event    # variáveis globais para controle de estado
 
     while True:
         try:
-            # print("esperando dados")
             # Recebe dados do servidor (bloqueia até receber)
             data, _ = client.receive()
 
             if not data:
-                # print("vazio")
                 continue
 
             # Sinaliza quando o servidor confirmou cadastro ou nome em uso
@@ -43,30 +43,32 @@ def receive_print(client):
             print(e)
             break
 
-# Uma saida elegante e que ainda sai da sala caso de ctrl+C
+# Função para tratar o sinal de interrupção (Ctrl+C)
 def handler(client, name, sig, frame):
     print("\n[!] Ctrl+C detectado, encerrando conexão...")
     client.send(name + "bye".encode() + b"\n")
     sys.exit(0)
 
 # Tamanho máximo da mensagem de identificação (16 bytes do texto + 20 para o nome)
-HEADER = 16 # hi, meu nome eh <- possui 16 caracteres contando com o ultimo espaco
+HEADER = 16     # hi, meu nome eh <- possui 16 caracteres contando com o ultimo espaco
 NAME_MAX_LEN = HEADER + 20
 
+# Função principal do cliente
 def main():
     global logged, msg_event
-    
-    SERVER_ADDRESS = (input("Digite o IP do servidor: "), 12345)
-    CLIENT_ADDRESS = ("0.0.0.0", 0)
+
+    SERVER_ADDRESS = (input("Digite o IP do servidor: "), 12345)    # Endereço do servidor
+    CLIENT_ADDRESS = ("0.0.0.0", 0)                                 # Endereço do cliente
 
     client = RDTFull(SERVER_ADDRESS, CLIENT_ADDRESS, 2.0)
-    print(f"Cliente rodando na porta {client.get_port_number()}")
+    print(f"[Cliente] Rodando na porta {client.get_port_number()}")
 
     # Thread para receber mensagens sem bloquear o fluxo principal
     recv_thread = threading.Thread(target=receive_print, args=(client,), daemon=True)
     recv_thread.start()
 
     signal.signal(signal.SIGINT, handler)
+
     # Aguardar confirmação do servidor (se mantém no loop caso tentem cadastrar um nome já em uso)
     while True:
         client.send(b"HI") # mensagem inicial para indentificação do usuário
@@ -90,9 +92,9 @@ def main():
         except:
             break
 
-    # recv_thread.join() # Esperar a thread terminar
     client.close()
     sys.exit(0)
 
+# Ponto de entrada do programa
 if __name__ == "__main__":
     main()

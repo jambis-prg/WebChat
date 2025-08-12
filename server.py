@@ -1,22 +1,22 @@
 import datetime
-import random
 from serverRDT import RDTServer
 import signal
 import sys
 
-names = {}          # nome_usuario -> endereço (IP, porta)
-friend_lists = {}   # nome_usuario -> conjunto de amigos (nomes)
-ban_votes = {}      # nome_usuario -> conjunto de nomes votados para banir
+names = {}                                          # nome_usuario -> endereço (IP, porta)
+friend_lists = {}                                   # nome_usuario -> conjunto de amigos (nomes)
+ban_votes = {}                                      # nome_usuario -> conjunto de nomes votados para banir
 
+# Manipulador de sinal para Ctrl+C
 def handler(sig, frame):
         print("\n[!] Ctrl+C detectado, encerrando servidor...")
         sys.exit(0)
         
-
 signal.signal(signal.SIGINT, handler)
 
 SERVER_ADDRESS = ("0.0.0.0", 12345)
 
+# Formata a mensagem para exibição
 def format_msg(addr, sender, msg, receiver):
     now = datetime.datetime.now().strftime("%H:%M:%S %d/%m/%Y")
     friend_tag = ""
@@ -26,38 +26,41 @@ def format_msg(addr, sender, msg, receiver):
 
     return f"{addr[0]}:{addr[1]}/~{friend_tag}{sender}: {msg} {now}"
 
+# Função principal do servidor
 def main():
     server = RDTServer(SERVER_ADDRESS, 2.0)
     print(f"Servidor ouvindo na porta 12345...")
 
+    # Loop principal
     while True:
-        msg, addr = server.receive()
+        msg, addr = server.receive()                # recebe a mensagem e o endereço
 
-        if msg == b"HI": # Envia mensagem para o usuário se identificar
+        if msg == b"HI":                            # envia mensagem para o usuário se identificar
             print("[Servidor] Alguem mandou um HI.")
             server.send(b"Identifique-se com: hi, meu nome eh <nome>\n", addr)  
             continue
-        elif msg.startswith(b"hi, meu nome eh"):
-                name_candidate = msg.split(b"hi, meu nome eh")[-1].strip().decode().strip('\x00')
-                print(f"[Servidor] Tentativa de usar nome '{name_candidate}'")
+        elif msg.startswith(b"hi, meu nome eh"):    # trata a mensagem de identificação
+            name_candidate = msg.split(b"hi, meu nome eh")[-1].strip().decode().strip('\x00')
+            print(f"[Servidor] Tentativa de usar nome '{name_candidate}'")
 
-                if name_candidate in names.keys():
-                    print("[Servidor] Nome ja em uso.")
-                    server.send(b"Nome ja em uso.\n", addr)
-                else:
-                    print("[Servidor] Nome cadastrado.")
-                    server.send(b"Nome cadastrado.\n", addr)
-                    names[name_candidate] = addr
-                    friend_lists[name_candidate] = set()
+            if name_candidate in names.keys():      # verifica se o nome já está em uso
+                print("[Servidor] Nome ja em uso.")
+                server.send(b"Nome ja em uso.\n", addr)
+            else:
+                print("[Servidor] Nome cadastrado.")
+                server.send(b"Nome cadastrado.\n", addr)
+                names[name_candidate] = addr
+                friend_lists[name_candidate] = set()
 
-                    # Anuncia a entrada para todos que já entraaram, exceto ele mesmo
-                    server.broadcast_to_registered(f"[Servidor] {name_candidate} entrou na sala.\n", names, exclude_addr=addr)
-                continue
-        
+                # Anuncia a entrada para todos que já entraram, exceto ele mesmo
+                server.broadcast_to_registered(f"[Servidor] {name_candidate} entrou na sala.\n", names, exclude_addr=addr)
+            continue
+
+        # Processa a mensagem do usuário
         nome = msg[:20].decode().strip('\x00')
         msg = msg[20:].decode().lstrip()[:-1]
-        
-        if msg.startswith("bye"):
+
+        if msg.startswith("bye"):                   # trata a mensagem de saída
             server.remove_addr(addr)
             print(f"[Servidor] '{nome}' saiu da sala.")
             server.broadcast(f"[Servidor] {nome} saiu da sala.\n")
@@ -67,17 +70,17 @@ def main():
             if (nome in ban_votes.keys()):
                 ban_votes.pop(nome, None)
 
-        elif msg.startswith("list"):
+        elif msg.startswith("list"):                # trata a mensagem de listagem de usuários
             print(f"[Servidor] '{nome}' esta listando a sala.")
             user_list = "List: " + ", ".join(names.keys()) + "\n"
             server.send(user_list.encode(), addr)
-        
-        elif msg.startswith("mylist"):
+
+        elif msg.startswith("mylist"):              # trata a mensagem de listagem de amigos
             print(f"[Servidor] '{nome}' esta listando seus amigos.")
             amigos = "MyList: " + ", ".join(friend_lists[nome]) + "\n"
             server.send(amigos.encode(), addr)
-        
-        elif msg.startswith("addtomylist"):
+
+        elif msg.startswith("addtomylist"):         # trata a mensagem de adição à lista de amigos
             parts = msg.split()
             if len(parts) > 1:
                 if parts[1] == nome:
@@ -96,7 +99,7 @@ def main():
                     print(f"[Servidor] '{parts}' ja esta na lista de amigos de {nome}.")
                     server.send("Essa pessoa ja esta na sua lista de amigos.\n".encode(), addr)
 
-        elif msg.startswith("rmvfrommylist"):
+        elif msg.startswith("rmvfrommylist"):       # trata a mensagem de remoção da lista de amigos
             parts = msg.split()
             if len(parts) > 1:
                 if parts[1] == nome:
@@ -114,8 +117,8 @@ def main():
                 else:
                     print(f"[Servidor] '{parts[1]}' nao esta na lista de amigos de {nome}.")
                     server.send("Essa pessoa nao esta na sua lista de amigos.\n".encode(), addr)
-        
-        elif msg.startswith("ban"):
+
+        elif msg.startswith("ban"):                 # trata a mensagem de banimento
             parts = msg.split()
             if len(parts) > 1:
                 target = parts[1]
@@ -142,13 +145,14 @@ def main():
                         for i in friend_lists.values():
                             i.discard(target)
                         friend_lists.pop(target)
-        else:
+        else:                                       # trata mensagens de chat
             print(f"[Servidor] BroadCast Message: '{msg}' from '{nome}'")
             for receiver, addr_receiver in names.items():
-                if addr_receiver == addr:  # não envia para si mesmo
+                if addr_receiver == addr:           # não envia para si mesmo
                     continue
                 formatted_msg = format_msg(addr, nome, msg, receiver)
                 server.send((formatted_msg + "\n").encode(), addr_receiver)
 
+# Inicializa o servidor
 if __name__ == "__main__":
     main()
