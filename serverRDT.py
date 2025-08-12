@@ -48,14 +48,14 @@ class RDTServer:
 
         while True:
             self.sock.sendto(pkt, addr)
-            print(f"[RDT] Pacote {seq} enviado para {addr}.")
+            # print(f"[RDT] Pacote {seq} enviado para {addr}.")
 
             start_time = time.time()
             while True:
                 elapsed = time.time() - start_time
                 remaining = self.timeout - elapsed
                 if remaining <= 0:
-                    print("[RDT] Timeout expirado. Retransmitindo...")
+                    # print("[RDT] Timeout expirado. Retransmitindo...")
                     break  # retransmitir
 
                 self.sock.settimeout(remaining)
@@ -67,13 +67,13 @@ class RDTServer:
                     
                     ack_seq = self._parse_ack(ack_data)
                     if ack_seq == seq:
-                        print(f"[RDT] ACK {ack_seq} recebido corretamente de {addr}.")
+                        # print(f"[RDT] ACK {ack_seq} recebido corretamente de {addr}.")
                         self.seqs[addr] ^= 1
                         return  # sucesso
-                    else:
-                        print(f"[RDT] ACK {ack_seq} incorreto. Ignorando...")
+                    # else:
+                        # print(f"[RDT] ACK {ack_seq} incorreto. Ignorando...")
                 except socket.timeout:
-                    print("[RDT] Timeout parcial. Retransmitindo...")
+                    #print("[RDT] Timeout parcial. Retransmitindo...")
                     break  # retransmitir
 
     def receive(self) -> Tuple[bytes, Tuple[str, int]]:
@@ -89,12 +89,12 @@ class RDTServer:
 
                 ack = self._make_ack(seq)
                 if seq == expected_seq and payload:
-                    print(f"[RDT] Pacote {seq} recebido corretamente.")
+                    # print(f"[RDT] Pacote {seq} recebido corretamente.")
                     self.sock.sendto(ack, addr)
                     self.expected_seqs[addr] ^= 1
                     return payload, addr
                 else:
-                    print(f"[RDT] Pacote duplicado {seq}. Reenviando último ACK.")
+                    # print(f"[RDT] Pacote duplicado {seq}. Reenviando último ACK.")
                     self.sock.sendto(ack, addr)
             except socket.timeout:
                 continue
