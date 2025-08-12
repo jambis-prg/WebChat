@@ -76,7 +76,6 @@ class RDTFull:
                 if seq == self.expected_seq and payload:
                     #print(f"[RDT] Pacote {seq} recebido corretamente.")
                     ack = self._make_ack(seq)
-
                     self.sock.sendto(ack, addr)
                     self.expected_seq ^= 1
                     return payload, addr

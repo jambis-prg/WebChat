@@ -114,6 +114,11 @@ class RDTServer:
             except Exception as e:
                 print(e)
                 pass
+
+    def broadcast_to_registered(self, message, names, exclude_addr=None):
+        for _, user_addr in names.items():
+            if user_addr != exclude_addr:
+                self.send(message.encode(), user_addr)
     
     def close(self):
         self.sock.close()
