@@ -123,25 +123,25 @@ def main():
                 if target not in names.keys():
                     print("[Servidor] Tentativa de banir uma pessoa nao cadastrada.")
                     server.send("Essa pessoa nao esta cadastrada.\n".encode(), addr)
-                
-                if target not in ban_votes:
-                    ban_votes[target] = set()
+                else:
+                    if target not in ban_votes:
+                        ban_votes[target] = set()
 
-                ban_votes[target].add(nome)
-                vote_count = len(ban_votes[target])
-                needed = len(names) // 2 + 1
-                server.broadcast(f"[Servidor] {nome} votou: ban {target} {vote_count}/{needed}\n")
-                
-                if vote_count >= needed:
-                    banned_usr_addr = names[target]
-                    server.send(b"[Servidor] Voce foi banido.\n", banned_usr_addr)
-                    server.remove_addr(banned_usr_addr)
-                    ban_votes.pop(target)
-                    names.pop(target)
+                    ban_votes[target].add(nome)
+                    vote_count = len(ban_votes[target])
+                    needed = len(names) // 2 + 1
+                    server.broadcast(f"[Servidor] {nome} votou: ban {target} {vote_count}/{needed}\n")
+                    
+                    if vote_count >= needed:
+                        banned_usr_addr = names[target]
+                        server.send(b"[Servidor] Voce foi banido.\n", banned_usr_addr)
+                        server.remove_addr(banned_usr_addr)
+                        ban_votes.pop(target)
+                        names.pop(target)
 
-                    for i in friend_lists.values():
-                        i.discard(target)
-                    friend_lists.pop(target)
+                        for i in friend_lists.values():
+                            i.discard(target)
+                        friend_lists.pop(target)
         else:
             print(f"[Servidor] BroadCast Message: '{msg}' from '{nome}'")
             for receiver, addr_receiver in names.items():

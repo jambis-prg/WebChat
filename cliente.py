@@ -51,10 +51,9 @@ NAME_MAX_LEN = HEADER + 20
 
 def main():
     global logged, msg_event
-    server_ip = "0.0.0.0"
     
-    SERVER_ADDRESS = (server_ip, 12345)
-    CLIENT_ADDRESS = (server_ip, 0)
+    SERVER_ADDRESS = (input("Digite o IP do servidor: "), 12345)
+    CLIENT_ADDRESS = ("0.0.0.0", 0)
 
     client = RDTFull(SERVER_ADDRESS, CLIENT_ADDRESS, 2.0)
     print(f"Cliente rodando na porta {client.get_port_number()}")
